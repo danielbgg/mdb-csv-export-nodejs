@@ -30,6 +30,7 @@ function csvHandler() {
 
         if (h == 'Extras') {
           var obj2 = breakKeyValue(d);
+          convertStringToDate(obj2);
           obj['NovoExtras'] = obj2;
         }
 
@@ -50,25 +51,50 @@ function breakKeyValue(content) {
     for (var j = 0; j < data2.length; j += 2) {
       var k = data2[j];
       var v = data2[j + 1];
-      obj[k] = v;
+      if (v.startsWith('{') || v.startsWith('[')) {
+        const obj2 = JSON.parse(v);
+        obj[k] = obj2;
+      } else {
+        obj[k] = v;
+      }
     }
   }
   return obj;
 }
 
+function isValidDate(dateString) {
+  const date = new Date(dateString);
+  return !isNaN(date) && dateString.includes('-'); // Simple check for a valid date format like 'YYYY-MM-DD'
+}
+
+function convertStringToDate(obj) {
+  if (typeof obj === 'object' && obj !== null) {
+      for (const key in obj) {
+          if (obj.hasOwnProperty(key)) {
+              if (typeof obj[key] === 'string' && isValidDate(obj[key])) {
+                  obj[key] = new Date(obj[key]);
+              } else if (typeof obj[key] === 'object') {
+                  convertStringToDate(obj[key]);
+              }
+          }
+      }
+  }
+}
+
 async function run() {
   try {
-    
+
     // Get the database and collection on which to run the operation
     const database = client.db("TESTS");
     const collection = database.collection("ExportCSV");
+    collection.deleteMany({});
 
     console.log("LENDO ARQUIVO CSV");
     var jsonObj = csvHandler();
 
-      const options = { upsert: true };
+    const options = { upsert: true };
 
-      const result = await collection.insertMany(jsonObj, options);
+    const result = await collection.insertMany(jsonObj, options);
 
   } finally {
     await client.close();
